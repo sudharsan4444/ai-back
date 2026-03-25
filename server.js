@@ -31,6 +31,26 @@ app.get('/', (req, res) => {
   res.send('AI Teaching Assistant API is running');
 });
 
+// Health check endpoint (with DB ping)
+app.get('/health', async (req, res) => {
+  try {
+    await mongoose.connection.db.admin().ping();
+    res.status(200).json({
+      status: 'ok',
+      database: 'connected',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'error',
+      database: 'disconnected',
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Start Server with graceful error handling
 const server = app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
