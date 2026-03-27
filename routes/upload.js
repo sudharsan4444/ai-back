@@ -58,22 +58,26 @@ router.post('/', protect, authorize('TEACHER', 'ADMIN'), upload.single('file'), 
             uploadedBy: req.user.id
         });
 
-        console.log(`[UPLOAD] 📥 Received file: ${req.file.originalname} (Type: ${type || 'PDF'})`);
-        const isPdf = path.extname(req.file.originalname).toLowerCase() === '.pdf';
-        console.log(`[UPLOAD] 📥 Is PDF? ${isPdf}. File Path: ${req.file.path}`);
+        // YouTube links: no file processing needed
+        if (req.file) {
+            console.log(`[UPLOAD] 📥 Received file: ${req.file.originalname} (Type: ${type || 'PDF'})`);
+            const isPdf = path.extname(req.file.originalname).toLowerCase() === '.pdf';
+            console.log(`[UPLOAD] 📥 Is PDF? ${isPdf}. File Path: ${req.file.path}`);
 
-        // If PDF, index it for RAG — run in BACKGROUND (non-blocking)
-        if (type !== 'YOUTUBE' && req.file && isPdf) {
-            console.log(`[UPLOAD] 🚀 Triggering RAG indexing for: ${material.title}`);
-            indexDocument(req.file.path, material._id)
-                .then(() => console.log(`[RAG] Background indexing complete for: ${material.title}`))
-                .catch(err => {
-                    console.error(`[RAG] ❌ Background indexing FAILED for ${material._id}:`, err);
-                    // Explicitly log stack trace for better debugging
-                    if (err.stack) console.error(err.stack);
-                });
+            // If PDF, index it for RAG — run in BACKGROUND (non-blocking)
+            if (isPdf) {
+                console.log(`[UPLOAD] 🚀 Triggering RAG indexing for: ${material.title}`);
+                indexDocument(req.file.path, material._id)
+                    .then(() => console.log(`[RAG] Background indexing complete for: ${material.title}`))
+                    .catch(err => {
+                        console.error(`[RAG] ❌ Background indexing FAILED for ${material._id}:`, err);
+                        if (err.stack) console.error(err.stack);
+                    });
+            } else {
+                console.log(`[UPLOAD] ⚠️ RAG Indexing skipped. Reason: Not a PDF`);
+            }
         } else {
-            console.log(`[UPLOAD] ⚠️ RAG Indexing skipped. Reason: ${type === 'YOUTUBE' ? 'Youtube material' : !req.file ? 'No file' : 'Not a PDF'}`);
+            console.log(`[UPLOAD] ⚠️ RAG Indexing skipped. Reason: ${type === 'YOUTUBE' ? 'YouTube material' : 'No file'}`);
         }
 
         res.status(201).json({ ...material.toObject(), indexing: true });

@@ -28,24 +28,19 @@ router.get('/', protect, async (req, res) => {
     try {
         let query = {};
         if (req.user.role === 'STUDENT') {
-            query = { 
-                status: 'PUBLISHED',
-                $or: [
-                    { department: req.user.department },
-                    { department: 'General' },
-                    { department: '' },
-                    { department: null },
-                    { department: { $exists: false } }
-                ]
-            };
+            // Students can access ALL published assessments (display limited to latest 4 on frontend)
+            query = { status: 'PUBLISHED' };
         } else if (req.user.role === 'TEACHER') {
             query = { createdBy: req.user.id };
         }
+        // ADMIN keeps query = {} to see all assessments
+
         const assessments = await Assessment.find(query)
             .populate('createdBy', 'name email')
             .sort({ createdAt: -1 });
         res.json(assessments);
     } catch (error) {
+        console.error('Error fetching assessments:', error);
         res.status(500).json({ message: 'Server Error' });
     }
 });

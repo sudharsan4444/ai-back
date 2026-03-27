@@ -131,15 +131,9 @@ router.get('/', protect, authorize('TEACHER', 'ADMIN'), async (req, res) => {
     try {
         let query = {};
         if (req.user.role === 'TEACHER') {
-            const myStudents = await User.find({
-                role: 'STUDENT',
-                $or: [
-                    { assignedTeacher: req.user.id },
-                    { facultyHead: req.user.id }
-                ]
-            }).select('_id');
-            const studentIds = myStudents.map(s => s._id);
-            query = { studentId: { $in: studentIds } };
+            // Only show submissions for this teacher's own assessments
+            const myAssessmentIds = await Assessment.find({ createdBy: req.user.id }).distinct('_id');
+            query = { assessmentId: { $in: myAssessmentIds } };
         }
 
         const submissions = await Submission.find(query)
