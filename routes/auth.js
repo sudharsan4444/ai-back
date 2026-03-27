@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { protect } = require('../middleware/authMiddleware');
+const { generateRollNumber } = require('../utils/rollNumberUtils');
 
 // Generate JWT
 const generateToken = (id, role) => {
@@ -16,7 +17,7 @@ const generateToken = (id, role) => {
 // @desc    Register a new user
 // @access  Public
 router.post('/register', async (req, res) => {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, department, year } = req.body;
 
     try {
         const userExists = await User.findOne({ email });
@@ -32,11 +33,23 @@ router.post('/register', async (req, res) => {
             return res.status(403).json({ message: 'Unauthorized role assignment' });
         }
 
+        const finalRole = role || 'STUDENT';
+
+        // Auto-generate roll number for student sign-ups
+        let rollNumber;
+        if (finalRole === 'STUDENT' && department) {
+            const studentYear = year || new Date().getFullYear();
+            rollNumber = await generateRollNumber(department, studentYear);
+        }
+
         const user = await User.create({
             name,
             email,
             password: hashedPassword,
-            role: role || 'STUDENT'
+            role: finalRole,
+            department: department || undefined,
+            year: (year && !isNaN(year)) ? year : undefined,
+            rollNumber: rollNumber || undefined
         });
 
         if (user) {
@@ -45,6 +58,8 @@ router.post('/register', async (req, res) => {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                department: user.department,
+                rollNumber: user.rollNumber,
                 token: generateToken(user._id, user.role),
             });
         } else {
@@ -62,7 +77,7 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email }).populate('facultyHead', 'name email department subjects');
 
         if (user && (await bcrypt.compare(password, user.password))) {
             res.json({
@@ -70,6 +85,13 @@ router.post('/login', async (req, res) => {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                department: user.department,
+                rollNumber: user.rollNumber,
+                year: user.year,
+                subjects: user.subjects,
+                gpa: user.gpa,
+                overallGrade: user.overallGrade,
+                facultyHead: user.facultyHead,
                 token: generateToken(user._id, user.role),
             });
         } else {

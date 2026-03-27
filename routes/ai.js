@@ -13,20 +13,10 @@ router.post('/chat', protect, async (req, res) => {
     const { message, materialId } = req.body;
 
     try {
-        // INTEGRITY CHECK: Block AI chat during active quiz
-        if (req.user.role === 'STUDENT') {
-            const activeQuiz = await Submission.findOne({
-                studentId: req.user.id,
-                status: 'IN_PROGRESS'
-            });
-
-            if (activeQuiz) {
-                return res.status(403).json({
-                    message: 'AI Chat is disabled during an active assessment.',
-                    integrityBlock: true
-                });
-            }
-        }
+        // NOTE: AI Chat is hidden on the frontend during active quiz-taking
+        // via the isQuizActive state in App.jsx. No server-side DB check needed
+        // because IN_PROGRESS submissions can persist even when the student
+        // is not actively in the quiz-taking interface.
 
         // Use materialId if and only if it's provided (Contextual Chat)
         const context = await queryContext(message, 5, materialId);
@@ -35,12 +25,6 @@ router.post('/chat', protect, async (req, res) => {
         if (context) {
             sysPrompt += `\nUse the following context to answer the student's question:\n${context}`;
         }
-
-        // The provided snippet seems to be for an AI service function, not directly for this route handler.
-        // Assuming the intent is to add logging around the generateContent call in this route.
-        // If the user intended to replace generateContent with a direct call to Groq,
-        // that would require importing callGroq and changing the logic significantly.
-        // Sticking to adding logging around the existing generateContent call as it's the most faithful interpretation for this file.
 
         const prompt = `${sysPrompt}\n\nUser: ${message}`;
         console.log(`[AI-ROUTE] Sending Chat Prompt (length: ${prompt.length})...`);
